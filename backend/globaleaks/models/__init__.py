@@ -1105,6 +1105,10 @@ class _User(Model):
     pgp_key_expiration = Column(DateTime, default=datetime_null, nullable=False)
     # END of PGP key fields
 
+    # BEGIN BrowserCrypt2
+    enc_prv_key = Column(UnicodeText, default=u'', nullable=True)
+    enc_pub_key = Column(UnicodeText, default=u'', nullable=True)
+
     unicode_keys = ['username', 'role', 'state',
                     'language', 'mail_address', 'name',
                     'language', 'change_email_address']
