@@ -70,7 +70,9 @@ def user_serialize_user(session, user, language):
         'picture': picture,
         'can_edit_general_settings': user.can_edit_general_settings,
         'tid': user.tid,
-        'usertenant_assocations': user_tenants
+        'usertenant_assocations': user_tenants,
+        'enc_prv_key': user.enc_prv_key,
+        'enc_pub_key': user.enc_pub_key
     }
 
     return get_localized_values(ret_dict, user, user.localized_keys, language)

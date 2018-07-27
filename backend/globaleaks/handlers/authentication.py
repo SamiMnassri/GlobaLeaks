@@ -16,6 +16,7 @@ from globaleaks.rest import errors, requests
 from globaleaks.settings import Settings
 from globaleaks.state import State
 from globaleaks.utils.utility import datetime_now, deferred_sleep, log, parse_csv_ip_ranges_to_ip_networks
+from globaleaks.utils.pgp import PGPContext
 
 
 def random_login_delay():
@@ -131,6 +132,15 @@ def login(session, tid, username, password, client_using_tor, client_ip, token='
 
         if success is not True:
             raise errors.AccessLocationInvalid
+
+    # Generate a PGP key if necessary
+    if user.enc_prv_key is None or user.enc_prv_key == "":
+        log.info("Login: Generating PGP keypair for %s (%s)" % (user.username, user.role))
+        pgpctx = PGPContext()
+        keypair = pgpctx.generate_key(user.name, user.mail_address, password)
+        user.enc_prv_key = keypair['privkey']
+        user.enc_pub_key = keypair['pubkey']
+        log.info("Login: PGP keypair successfully created for %s" % user.username)
 
     log.debug("Login: Success (%s)" % user.role)
 

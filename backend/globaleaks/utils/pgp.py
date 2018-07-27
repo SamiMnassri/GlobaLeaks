@@ -40,6 +40,33 @@ class PGPContext(object):
             log.err("Unable to instance PGP object: %s" % excep)
             raise
 
+    def generate_key(self, name, email, passphrase):
+        """
+        @param name Real name to genreate on the key
+        @param email Email address to use on the key
+        """
+
+        try:
+            gnupg_params = {
+                'key_type': "RSA",
+                'key_length': 2048,
+                'name_real': name,
+                'name_email': email,
+                'passphrase': passphrase
+            }
+            gen_params = self.gnupg.gen_key_input(**gnupg_params)
+            keygen = self.gnupg.gen_key(gen_params)
+            user_pubkey = self.gnupg.export_keys(keygen.fingerprint)
+            user_privkey = self.gnupg.export_keys(keygen.fingerprint, True, passphrase=passphrase)
+
+            return {
+                'pubkey': user_pubkey,
+                'privkey': user_privkey
+            }
+        except Exception as excep:
+            log.err("Unable to generate PGP key: %s" % excep)
+            raise
+
     def load_key(self, key):
         """
         @param key

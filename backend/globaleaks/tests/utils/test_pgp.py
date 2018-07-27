@@ -55,3 +55,8 @@ class TestPGP(helpers.TestGL):
 
         self.assertEqual(pgpctx.load_key(helpers.PGPKEYS['EXPIRED_PGP_KEY_PUB'])['expiration'],
                          datetime.utcfromtimestamp(1391012793))
+
+    def test_key_generation(self):
+        '''Test generating a PGP key'''
+        pgpctx = PGPContext()
+        pgpctx.generate_key("GnuPG test user", "test@globaleaks.org", "12345678")
