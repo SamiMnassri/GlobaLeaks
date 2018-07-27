@@ -2,9 +2,10 @@
 import os
 from datetime import datetime
 
-from globaleaks.utils.pgp import PGPContext
+from globaleaks.utils.pgp import PGPContext, PGPyContext
 from globaleaks.tests import helpers
 
+import pgpy
 
 class TestPGP(helpers.TestGL):
     secret_content = helpers.PGPKEYS['VALID_PGP_KEY1_PRV']
@@ -56,7 +57,29 @@ class TestPGP(helpers.TestGL):
         self.assertEqual(pgpctx.load_key(helpers.PGPKEYS['EXPIRED_PGP_KEY_PUB'])['expiration'],
                          datetime.utcfromtimestamp(1391012793))
 
+class TestPGPy(helpers.TestGL):
     def test_key_generation(self):
         '''Test generating a PGP key'''
-        pgpctx = PGPContext()
-        pgpctx.generate_key("GnuPG test user", "test@globaleaks.org", "12345678")
+        pgpyctx = PGPyContext()
+        pgpyctx.generate_key("GnuPG test user", "test@globaleaks.org", "12345678")
+        self.assertNotEqual(pgpyctx.public_key, None)
+        self.assertNotEqual(pgpyctx.private_key, None)
+
+    def test_encrypt_decrypt(self):
+        '''Test generating a PGP key'''
+        pgpyctx = PGPyContext()
+        pgpyctx.generate_key("GnuPG test user", "test@globaleaks.org", "12345678")
+        enc_msg = pgpyctx.encrypt_text_message("Test message")
+        decrypt_text = pgpyctx.decrypt_text_message(enc_msg, "12345678")
+
+    def test_change_pw(self):
+        '''Test generating a PGP key'''
+        pgpyctx = PGPyContext()
+        pgpyctx.generate_key("GnuPG test user", "test@globaleaks.org", "12345678")
+        enc_msg = pgpyctx.encrypt_text_message("Test message")
+
+        pgpyctx.change_passphrase("12345678", "87654321")
+        with self.assertRaises(pgpy.errors.PGPDecryptionError):
+            pgpyctx.decrypt_text_message(enc_msg, "12345678")
+        decrypt_text = pgpyctx.decrypt_text_message(enc_msg, "87654321")
+        self.assertEqual(decrypt_text, "Test message")

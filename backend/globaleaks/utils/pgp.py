@@ -7,6 +7,9 @@ from datetime import datetime
 
 from gnupg import GPG
 
+import pgpy
+from pgpy.constants import PubKeyAlgorithm, KeyFlags, HashAlgorithm, SymmetricKeyAlgorithm, CompressionAlgorithm
+
 from globaleaks.rest import errors
 from globaleaks.utils.utility import log
 
@@ -38,33 +41,6 @@ class PGPContext(object):
             raise
         except Exception as excep:
             log.err("Unable to instance PGP object: %s" % excep)
-            raise
-
-    def generate_key(self, name, email, passphrase):
-        """
-        @param name Real name to genreate on the key
-        @param email Email address to use on the key
-        """
-
-        try:
-            gnupg_params = {
-                'key_type': "RSA",
-                'key_length': 2048,
-                'name_real': name,
-                'name_email': email,
-                'passphrase': passphrase
-            }
-            gen_params = self.gnupg.gen_key_input(**gnupg_params)
-            keygen = self.gnupg.gen_key(gen_params)
-            user_pubkey = self.gnupg.export_keys(keygen.fingerprint)
-            user_privkey = self.gnupg.export_keys(keygen.fingerprint, True, passphrase=passphrase)
-
-            return {
-                'pubkey': user_pubkey,
-                'privkey': user_privkey
-            }
-        except Exception as excep:
-            log.err("Unable to generate PGP key: %s" % excep)
             raise
 
     def load_key(self, key):
@@ -129,3 +105,84 @@ class PGPContext(object):
             shutil.rmtree(self.gnupg.gnupghome)
         except Exception as excep:
             log.err("Unable to clean temporary PGP environment: %s: %s", self.gnupg.gnupghome, excep)
+
+class PGPyContext(object):
+    """
+    For BrowserCrypto related events, we use pgpy for multiple reasons, specifically to
+    allow us to not have to write keys out to disk, and to have better control of having
+    things like private key encryption
+    """
+
+    def __init__(self):
+        self.key_obj = None
+
+    @property
+    def public_key(self):
+        if (self.key_obj) is None:
+            raise errors.InputValidationError
+
+        return str(self.key_obj.pubkey)
+
+    @property
+    def private_key(self):
+        if (self.key_obj) is None:
+            raise errors.InputValidationError
+
+        return str(self.key_obj)
+
+    def generate_key(self, name, email, passphrase):
+        """
+        @param name Real name to genreate on the key
+        @param email Email address to use on the key
+        """
+
+        try:
+            # Generate the primary key
+            key = pgpy.PGPKey.new(PubKeyAlgorithm.RSAEncryptOrSign, 2048)
+            uid = pgpy.PGPUID.new(name, email=email)
+
+            key.add_uid(uid, usage={KeyFlags.Sign}, hashes=[HashAlgorithm.SHA512, HashAlgorithm.SHA256],
+                        ciphers=[SymmetricKeyAlgorithm.AES256, SymmetricKeyAlgorithm.Camellia256],
+                        compression=[CompressionAlgorithm.BZ2, CompressionAlgorithm.Uncompressed])
+
+            # Generate the subkey
+            subkey = pgpy.PGPKey.new(PubKeyAlgorithm.RSAEncryptOrSign, 2048)
+            key.add_subkey(subkey, usage={KeyFlags.EncryptCommunications})
+
+            # Passwork protect
+            key.protect(passphrase, SymmetricKeyAlgorithm.AES256, HashAlgorithm.SHA256)
+
+            self.key_obj = key
+
+        except Exception as excep:
+            log.err("Unable to generate PGP key: %s" % excep)
+            raise
+
+    def change_passphrase(self, old_passphrase, new_passphrase):
+        """
+        Changes the passphrase on the private key
+        """
+
+        with self.key_obj.unlock(old_passphrase) as ukey:
+            ukey.protect(new_passphrase, SymmetricKeyAlgorithm.AES256, HashAlgorithm.SHA256)
+
+    def encrypt_text_message(self, plaintext):
+        """
+        Encrypt a text message with the specified key
+        """
+
+        msg_obj = pgpy.PGPMessage.new(plaintext)
+
+        # Find the encrypt subkey
+        pubkey = self.key_obj.pubkey
+        encrypted_msg = self.key_obj.pubkey.encrypt(msg_obj)
+
+        return str(encrypted_msg)
+
+    def decrypt_text_message(self, crypttext, passphrase):
+        """
+        Decrypts a text message with specified key
+        """
+        msg_obj = pgpy.PGPMessage.from_blob(crypttext)
+        with self.key_obj.unlock(passphrase) as ukey:
+            return str(ukey.decrypt(msg_obj).message)

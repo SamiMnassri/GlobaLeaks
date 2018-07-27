@@ -16,7 +16,7 @@ from globaleaks.rest import errors, requests
 from globaleaks.settings import Settings
 from globaleaks.state import State
 from globaleaks.utils.utility import datetime_now, deferred_sleep, log, parse_csv_ip_ranges_to_ip_networks
-from globaleaks.utils.pgp import PGPContext
+from globaleaks.utils.pgp import PGPyContext
 
 
 def random_login_delay():
@@ -136,10 +136,10 @@ def login(session, tid, username, password, client_using_tor, client_ip, token='
     # Generate a PGP key if necessary
     if user.enc_prv_key is None or user.enc_prv_key == "":
         log.info("Login: Generating PGP keypair for %s (%s)" % (user.username, user.role))
-        pgpctx = PGPContext()
+        pgpctx = PGPyContext()
         keypair = pgpctx.generate_key(user.name, user.mail_address, password)
-        user.enc_prv_key = keypair['privkey']
-        user.enc_pub_key = keypair['pubkey']
+        user.enc_prv_key = pgpctx.private_key
+        user.enc_pub_key = pgpctx.public_key
         log.info("Login: PGP keypair successfully created for %s" % user.username)
 
     log.debug("Login: Success (%s)" % user.role)
