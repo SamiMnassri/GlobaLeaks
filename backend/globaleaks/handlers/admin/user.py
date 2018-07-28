@@ -18,7 +18,8 @@ from globaleaks.rest import requests, errors
 from globaleaks.state import State
 from globaleaks.utils import security
 from globaleaks.utils.structures import fill_localized_keys, get_localized_values
-from globaleaks.utils.utility import datetime_now, uuid4
+from globaleaks.utils.utility import datetime_now, uuid4, log
+from globaleaks.utils.pgp import PGPyContext
 
 
 def admin_serialize_receiver(session, receiver, user, language):
@@ -93,6 +94,14 @@ def create(state, tid, request, language):
     return create_user(state, tid, request, language)
 
 
+def db_generate_private_keys_for_user(session, user, passphrase):
+    log.info("Login: Generating PGP keypair for %s (%s)" % (user.username, user.role))
+    pgpctx = PGPyContext()
+    keypair = pgpctx.generate_key(user.name, user.mail_address, passphrase)
+    user.enc_prv_key = pgpctx.private_key
+    user.enc_pub_key = pgpctx.public_key
+    log.info("Login: PGP keypair successfully created for %s" % user.username)
+
 def db_create_user(session, state, tid, request, language):
     request['tid'] = tid
 
@@ -135,6 +144,9 @@ def db_create_user(session, state, tid, request, language):
 
     # The various options related in manage PGP keys are used here.
     parse_pgp_options(state, user, request)
+
+    # Generate the private key
+    db_generate_private_keys_for_user(session, user, password)
 
     session.add(user)
 

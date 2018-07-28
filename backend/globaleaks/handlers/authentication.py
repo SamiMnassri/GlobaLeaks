@@ -135,12 +135,8 @@ def login(session, tid, username, password, client_using_tor, client_ip, token='
 
     # Generate a PGP key if necessary
     if user.enc_prv_key is None or user.enc_prv_key == "":
-        log.info("Login: Generating PGP keypair for %s (%s)" % (user.username, user.role))
-        pgpctx = PGPyContext()
-        keypair = pgpctx.generate_key(user.name, user.mail_address, password)
-        user.enc_prv_key = pgpctx.private_key
-        user.enc_pub_key = pgpctx.public_key
-        log.info("Login: PGP keypair successfully created for %s" % user.username)
+        from globaleaks.handlers.admin.user import db_generate_private_keys_for_user
+        db_generate_private_keys_for_user(session, user, password)
 
     log.debug("Login: Success (%s)" % user.role)
 
