@@ -13,12 +13,13 @@ from globaleaks.handlers.admin.submission_statuses import db_get_id_for_system_s
 from globaleaks.handlers.base import BaseHandler
 from globaleaks.orm import transact
 from globaleaks.rest import errors, requests
-from globaleaks.utils.security import hash_password, sha256, generateRandomReceipt
+from globaleaks.utils.security import hash_password, sha256, generateRandomReceipt, generateRandomKey
 from globaleaks.state import State
 from globaleaks.utils.structures import get_localized_values
 from globaleaks.utils.token import TokenList
 from globaleaks.utils.utility import log, get_expiration, \
     datetime_now, datetime_never, datetime_to_ISO8601
+from globaleaks.utils.pgp import PGPyContext
 
 
 def db_assign_submission_progressive(session, tid):
@@ -245,7 +246,7 @@ def serialize_usertip(session, usertip, itip, language):
     return ret
 
 
-def db_create_receivertip(session, receiver, internaltip):
+def db_create_receivertip(session, receiver, internaltip, aes_enc_key):
     """
     Create models.ReceiverTip for the required tier of models.Receiver.
     """
@@ -254,6 +255,7 @@ def db_create_receivertip(session, receiver, internaltip):
     receivertip = models.ReceiverTip()
     receivertip.internaltip_id = internaltip.id
     receivertip.receiver_id = receiver.id
+    receivertip.enc_key = aes_enc_key
 
     session.add(receivertip)
 
@@ -316,10 +318,21 @@ def db_create_submission(session, tid, request, uploaded_files, client_using_tor
 
     receipt = text_type(generateRandomReceipt())
 
+    # Generate browser crypto key
+    wb_pgpctx = PGPyContext()
+    keypair = wb_pgpctx.generate_key("Whistleblower", None, receipt)
+
     wbtip = models.WhistleblowerTip()
     wbtip.id = submission.id
     wbtip.tid = submission.tid
     wbtip.receipt_hash = hash_password(receipt, State.tenant_cache[tid].receipt_salt)
+    wbtip.wb_prv_key = wb_pgpctx.private_key
+    wbtip.wb_pub_key = wb_pgpctx.public_key
+
+    # Generate the AES crypt key
+    aes_key = generateRandomKey(32)
+    wbtip.wb_tip_key = wb_pgpctx.encrypt_text_message(aes_key)
+
     session.add(wbtip)
 
     db_save_questionnaire_answers(session, tid, submission.id, answers)
@@ -350,8 +363,11 @@ def db_create_submission(session, tid, request, uploaded_files, client_using_tor
                                          models.User.id == models.Receiver.id,
                                          models.UserTenant.user_id == models.User.id,
                                          models.UserTenant.tenant_id == tid):
-        if user.pgp_key_public or State.tenant_cache[tid].allow_unencrypted:
-            db_create_receivertip(session, receiver, submission)
+        if user.enc_pub_key != '' or State.tenant_cache[tid].allow_unencrypted:
+            user_pgpctx = PGPyContext.from_blob(user.enc_prv_key)
+            user_enc_aes_key = user_pgpctx.encrypt_text_message(aes_key)
+
+            db_create_receivertip(session, receiver, submission, user_enc_aes_key)
             rtips_count += 1
 
     if rtips_count == 0:

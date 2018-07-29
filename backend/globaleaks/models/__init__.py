@@ -851,6 +851,7 @@ class _ReceiverTip(Model):
     can_access_whistleblower_identity = Column(Boolean, default=False, nullable=False)
     new = Column(Integer, default=True, nullable=False)
     enable_notifications = Column(Boolean, default=True, nullable=False)
+    enc_key = Column(Unicode, nullable=True)
 
     unicode_keys = ['label']
 

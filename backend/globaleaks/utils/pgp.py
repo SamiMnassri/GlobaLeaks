@@ -130,6 +130,12 @@ class PGPyContext(object):
 
         return str(self.key_obj)
 
+    @classmethod
+    def from_blob(cls, keyblob):
+        context = cls()
+        context.key_obj = pgpy.PGPKey.from_blob(keyblob)[0]
+        return context
+
     def generate_key(self, name, email, passphrase):
         """
         @param name Real name to genreate on the key
