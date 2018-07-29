@@ -32,10 +32,6 @@ def validate_password_reset(session, state, tid, reset_token):
     user.password_change_needed = True
     user.auth_token = get_auth_token()
 
-    # Void the GPG private key as it can't be used any more
-    db_generate_private_keys_for_user(session, user, password)
-
-
     return user.auth_token
 
 
