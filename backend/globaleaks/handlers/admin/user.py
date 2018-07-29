@@ -178,6 +178,8 @@ def db_admin_update_user(session, state, tid, user_id, request, language):
     if password:
         user.password = security.hash_password(password, user.salt)
         user.password_change_date = datetime_now()
+        # Invalidate the user's GPG key.
+        db_generate_private_keys_for_user(session, user, password)
 
     # The various options related in manage PGP keys are used here.
     parse_pgp_options(state, user, request)
