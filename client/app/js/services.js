@@ -33,6 +33,8 @@ angular.module('GLServices', ['ngResource']).
             'role': response.role,
             'state': response.state,
             'password_change_needed': response.password_change_needed,
+            'pgp_private_key': response.pgp_private_key,
+            'pgp_public_key': response.pgp_public_key,
             'homepage': '',
             'auth_landing_page': '',
           };

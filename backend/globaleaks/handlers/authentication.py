@@ -50,7 +50,7 @@ def random_login_delay():
 
 def db_get_wbtip_by_receipt(session, tid, receipt):
     hashed_receipt = security.hash_password(receipt, State.tenant_cache[tid].receipt_salt)
-    return session.query(InternalTip) \
+    return session.query(WhistleblowerTip) \
                   .filter(WhistleblowerTip.receipt_hash == text_type(hashed_receipt, 'utf-8'),
                           WhistleblowerTip.tid == tid,
                           InternalTip.id == WhistleblowerTip.id,
@@ -76,7 +76,7 @@ def login_whistleblower(session, tid, receipt, client_using_tor):
 
     wbtip.last_access = datetime_now()
 
-    return wbtip.id
+    return wbtip.id, wbtip.wb_prv_key, wbtip.wb_pub_key
 
 
 @transact
@@ -142,7 +142,7 @@ def login(session, tid, username, password, client_using_tor, client_ip, token='
 
     user.last_login = datetime_now()
 
-    return user.id, user.state, user.role, user.password_change_needed
+    return user.id, user.state, user.role, user.password_change_needed, user.enc_prv_key, user.enc_pub_key
 
 
 @transact
@@ -178,14 +178,14 @@ class AuthenticationHandler(BaseHandler):
         if tid == 0:
              tid = self.request.tid
 
-        user_id, status, role, pcn = yield login(tid,
-                                                 request['username'],
-                                                 request['password'],
-                                                 self.request.client_using_tor,
-                                                 self.request.client_ip,
-                                                 request['token'])
+        user_id, status, role, pcn, privkey, pubkey,  = yield login(tid,
+                                                                    request['username'],
+                                                                    request['password'],
+                                                                    self.request.client_using_tor,
+                                                                    self.request.client_ip,
+                                                                    request['token'])
         if tid == self.request.tid:
-            session = new_session(self.request.tid, user_id, role, status)
+            session = new_session(self.request.tid, user_id, role, status, privkey, pubkey)
 
             returnValue({
                 'session_id': session.id,
@@ -193,7 +193,9 @@ class AuthenticationHandler(BaseHandler):
                 'user_id': session.user_id,
                 'session_expiration': int(session.getTime()),
                 'status': session.user_status,
-                'password_change_needed': pcn
+                'password_change_needed': pcn,
+                'pgp_private_key': session.privkey,
+                'pgp_public_key': session.pubkey
             })
 
         else:
@@ -222,15 +224,17 @@ class ReceiptAuthHandler(BaseHandler):
         if delay:
             yield deferred_sleep(delay)
 
-        user_id = yield login_whistleblower(self.request.tid, receipt, self.request.client_using_tor)
+        user_id, privkey, pubkey = yield login_whistleblower(self.request.tid, receipt, self.request.client_using_tor)
 
-        session = new_session(self.request.tid, user_id, 'whistleblower', 'Enabled')
+        session = new_session(self.request.tid, user_id, 'whistleblower', 'Enabled', privkey, pubkey)
 
         returnValue({
             'session_id': session.id,
             'role': session.user_role,
             'user_id': session.user_id,
-            'session_expiration': int(session.getTime())
+            'session_expiration': int(session.getTime()),
+            'pgp_private_key': session.privkey,
+            'pgp_public_key': session.pubkey
         })
 
 
@@ -250,7 +254,9 @@ class SessionHandler(BaseHandler):
             'user_id': self.current_user.user_id,
             'session_expiration': int(self.current_user.getTime()),
             'status': self.current_user.user_status,
-            'password_change_needed': False
+            'password_change_needed': False,
+            'pgp_private_key': session.privkey,
+            'pgp_public_key': session.pubkey
         }
 
     def delete(self):
