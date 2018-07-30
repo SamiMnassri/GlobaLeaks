@@ -96,7 +96,7 @@ class FileProducer(object):
 class Session(object):
     expireCall = None # attached to object by tempDict
 
-    def __init__(self, tid, user_id, user_role, user_status, privkey, pubkey, salt):
+    def __init__(self, tid, user_id, user_role, user_status, privkey, pubkey, bcrypto_salt):
         self.id = generateRandomKey(42)
         self.tid = tid
         self.user_id = user_id
@@ -104,14 +104,14 @@ class Session(object):
         self.user_status = user_status
         self.privkey = privkey
         self.pubkey = pubkey
-        self.salt = salt
+        self.bcrypto_salt = bcrypto_salt
 
     def getTime(self):
         return self.expireCall.getTime()
 
 
-def new_session(tid, user_id, user_role, user_status, privkey, pubkey, salt):
-    session = Session(tid, user_id, user_role, user_status, privkey, pubkey, salt)
+def new_session(tid, user_id, user_role, user_status, privkey, pubkey, bcrypto_salt):
+    session = Session(tid, user_id, user_role, user_status, privkey, pubkey, bcrypto_salt)
     Sessions.revoke_all_sessions(user_id)
     Sessions.set(session.id, session)
     return session

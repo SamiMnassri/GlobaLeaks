@@ -194,9 +194,9 @@ class AuthenticationHandler(BaseHandler):
                 'session_expiration': int(session.getTime()),
                 'status': session.user_status,
                 'password_change_needed': pcn,
-                'salt': salt,
-                'pgp_private_key': session.privkey,
-                'pgp_public_key': session.pubkey
+                'bcrypto_salt': session.bcrypto_salt,
+                'bcrypto_private_key': session.privkey,
+                'bcrypto_public_key': session.pubkey
             })
 
         else:
@@ -234,7 +234,7 @@ class ReceiptAuthHandler(BaseHandler):
             'role': session.user_role,
             'user_id': session.user_id,
             'session_expiration': int(session.getTime()),
-            'salt': session.salt,
+            'bcrypto_salt': session.bcrypto_salt,
             'pgp_private_key': session.privkey,
             'pgp_public_key': session.pubkey
         })
