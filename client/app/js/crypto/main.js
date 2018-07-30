@@ -71,6 +71,39 @@ angular.module('GLBrowserCrypto', [])
 
     return {
       /**
+       * @description scrypt worker
+       * @param {String} data
+       * @param {String} salt
+       * @param {int} logN
+       * @param {String} dkLen
+       */
+
+      scrypt: function(data, salt, logN, dkLen) {
+        var defer = $q.defer();
+
+        var worker = new Worker('/js/crypto/scrypt-async.worker.js');
+
+        worker.onmessage = function(e) {
+          defer.resolve({
+            value: data,
+            stretched: e.data
+          });
+          worker.terminate();
+        };
+
+        worker.postMessage({
+          password: data,
+          salt: salt,
+          logN: logN,
+          r: 8,
+          dkLen: dkLen,
+          encoding: 'utf-8'
+        });
+
+        return defer.promise;
+      },
+
+      /**
        * @decription checks to see if passed text is an ascii armored GPG
        * public key. If so, the fnc returns true.
        * @param {String} textInput

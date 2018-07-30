@@ -13,7 +13,7 @@ from globaleaks.handlers.admin.submission_statuses import db_get_id_for_system_s
 from globaleaks.handlers.base import BaseHandler
 from globaleaks.orm import transact
 from globaleaks.rest import errors, requests
-from globaleaks.utils.security import hash_password, sha256, generateRandomReceipt, generateRandomKey
+from globaleaks.utils.security import hash_password, sha256, generateRandomReceipt, generateRandomKey, generateRandomSalt
 from globaleaks.state import State
 from globaleaks.utils.structures import get_localized_values
 from globaleaks.utils.token import TokenList
@@ -326,6 +326,7 @@ def db_create_submission(session, tid, request, uploaded_files, client_using_tor
     wbtip.id = submission.id
     wbtip.tid = submission.tid
     wbtip.receipt_hash = hash_password(receipt, State.tenant_cache[tid].receipt_salt)
+    wbtip.wb_salt = generateRandomSalt()
     wbtip.wb_prv_key = wb_pgpctx.private_key
     wbtip.wb_pub_key = wb_pgpctx.public_key
 

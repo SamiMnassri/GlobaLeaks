@@ -1188,6 +1188,7 @@ class _WhistleblowerTip(Model):
     tid = Column(Integer, default=1, nullable=False)
     receipt_hash = Column(Unicode(128), nullable=False)
 
+    wb_salt = Column(Unicode, default=u'', nullable=False)
     wb_prv_key = Column(Unicode, default=u'', nullable=False)
     wb_pub_key = Column(Unicode, default=u'', nullable=False)
     wb_tip_key = Column(Unicode, default=u'', nullable=False)

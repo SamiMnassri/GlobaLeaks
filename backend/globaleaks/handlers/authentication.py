@@ -76,7 +76,7 @@ def login_whistleblower(session, tid, receipt, client_using_tor):
 
     wbtip.last_access = datetime_now()
 
-    return wbtip.id, wbtip.wb_prv_key, wbtip.wb_pub_key
+    return wbtip.id, wbtip.wb_prv_key, wbtip.wb_pub_key, wbtip.wb_salt
 
 
 @transact
@@ -142,7 +142,7 @@ def login(session, tid, username, password, client_using_tor, client_ip, token='
 
     user.last_login = datetime_now()
 
-    return user.id, user.state, user.role, user.password_change_needed, user.enc_prv_key, user.enc_pub_key
+    return user.id, user.state, user.role, user.password_change_needed, user.enc_prv_key, user.enc_pub_key, user.salt
 
 
 @transact
@@ -178,14 +178,14 @@ class AuthenticationHandler(BaseHandler):
         if tid == 0:
              tid = self.request.tid
 
-        user_id, status, role, pcn, privkey, pubkey,  = yield login(tid,
-                                                                    request['username'],
-                                                                    request['password'],
-                                                                    self.request.client_using_tor,
-                                                                    self.request.client_ip,
-                                                                    request['token'])
+        user_id, status, role, pcn, privkey, pubkey, salt  = yield login(tid,
+                                                                         request['username'],
+                                                                         request['password'],
+                                                                         self.request.client_using_tor,
+                                                                         self.request.client_ip,
+                                                                         request['token'])
         if tid == self.request.tid:
-            session = new_session(self.request.tid, user_id, role, status, privkey, pubkey)
+            session = new_session(self.request.tid, user_id, role, status, privkey, pubkey, salt)
 
             returnValue({
                 'session_id': session.id,
@@ -194,6 +194,7 @@ class AuthenticationHandler(BaseHandler):
                 'session_expiration': int(session.getTime()),
                 'status': session.user_status,
                 'password_change_needed': pcn,
+                'salt': salt,
                 'pgp_private_key': session.privkey,
                 'pgp_public_key': session.pubkey
             })
@@ -224,15 +225,16 @@ class ReceiptAuthHandler(BaseHandler):
         if delay:
             yield deferred_sleep(delay)
 
-        user_id, privkey, pubkey = yield login_whistleblower(self.request.tid, receipt, self.request.client_using_tor)
+        user_id, privkey, pubkey, salt = yield login_whistleblower(self.request.tid, receipt, self.request.client_using_tor)
 
-        session = new_session(self.request.tid, user_id, 'whistleblower', 'Enabled', privkey, pubkey)
+        session = new_session(self.request.tid, user_id, 'whistleblower', 'Enabled', privkey, pubkey, salt)
 
         returnValue({
             'session_id': session.id,
             'role': session.user_role,
             'user_id': session.user_id,
             'session_expiration': int(session.getTime()),
+            'salt': session.salt,
             'pgp_private_key': session.privkey,
             'pgp_public_key': session.pubkey
         })
@@ -255,6 +257,7 @@ class SessionHandler(BaseHandler):
             'session_expiration': int(self.current_user.getTime()),
             'status': self.current_user.user_status,
             'password_change_needed': False,
+            'salt': session.salt,
             'pgp_private_key': session.privkey,
             'pgp_public_key': session.pubkey
         }
