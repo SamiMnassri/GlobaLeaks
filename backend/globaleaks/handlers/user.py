@@ -7,6 +7,7 @@ from globaleaks.handlers.base import BaseHandler
 from globaleaks.orm import transact
 from globaleaks.rest import errors, requests
 from globaleaks.state import State
+from globaleaks.utils.crypto import AsyncCryptographyContext
 from globaleaks.utils.pgp import PGPContext
 from globaleaks.utils.security import check_password, hash_password, generateRandomKey
 from globaleaks.utils.structures import get_localized_values
@@ -130,6 +131,15 @@ def db_user_update_user(session, state, tid, user_id, request):
 
         user.password = hash_password(new_password, user.salt)
         user.password_change_date = datetime_now()
+
+        # Change password on priv key
+        if user.crypto_prv_key is None or user.crypto_prv_key == "":
+            context = AsyncCryptographyContext.load_full_keyset(
+                user.crypto_prv_key,
+                user.crypto_key,
+                new_password
+            )
+            user.crypto_prv_key = context.change_private_key_password(new_password)
 
     # If the email address changed, send a validation email
     if request['mail_address'] != user.mail_address:

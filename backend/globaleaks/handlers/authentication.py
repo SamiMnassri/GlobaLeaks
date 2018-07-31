@@ -128,6 +128,11 @@ def login(session, tid, username, password, client_using_tor, client_ip, token='
         if success is not True:
             raise errors.AccessLocationInvalid
 
+    # Generate a PGP key if necessary
+    if user.crypto_prv_key is None or user.crypto_prv_key == "":
+        from globaleaks.handlers.admin.user import db_generate_private_keys_for_user
+        db_generate_private_keys_for_user(session, user, password)
+
     user.last_login = datetime_now()
 
     return new_session(tid, user.id, user.role, user.password_change_needed)

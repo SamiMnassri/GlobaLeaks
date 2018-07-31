@@ -16,9 +16,9 @@ from globaleaks.handlers.user import parse_pgp_options, \
 from globaleaks.orm import transact
 from globaleaks.rest import requests, errors
 from globaleaks.state import State
-from globaleaks.utils import security
+from globaleaks.utils import security, crypto
 from globaleaks.utils.structures import fill_localized_keys, get_localized_values
-from globaleaks.utils.utility import datetime_now, uuid4
+from globaleaks.utils.utility import datetime_now, uuid4, log
 
 
 def admin_serialize_receiver(session, receiver, user, language):
@@ -41,6 +41,15 @@ def admin_serialize_receiver(session, receiver, user, language):
 
     return get_localized_values(ret_dict, receiver, receiver.localized_keys, language)
 
+def db_generate_private_keys_for_user(session, user, passphrase):
+    log.info("Login: Generating crypto keypair for %s (%s)" % (user.username, user.role))
+    crypto_context = crypto.AsyncCryptographyContext()
+    crypto_context.generate_private_key(passphrase)
+    crypto_context.generate_self_signed_certificate(user.username)
+    user.crypto_prv_key = crypto_context.private_key_pem
+    user.crypto_key = crypto_context.certificate_pem
+
+    log.info("Login: crypto keypair successfully created for %s" % user.username)
 
 def db_create_usertenant_association(session, user_id, tenant_id):
     usertenant = models.UserTenant()
@@ -132,6 +141,9 @@ def db_create_user(session, state, tid, request, language):
     # The various options related in manage PGP keys are used here.
     parse_pgp_options(state, user, request)
 
+    # Generate the private key
+    db_generate_private_keys_for_user(session, user, password)
+
     session.add(user)
 
     session.flush()
@@ -162,6 +174,8 @@ def db_admin_update_user(session, state, tid, user_id, request, language):
     if password:
         user.password = security.hash_password(password, user.salt)
         user.password_change_date = datetime_now()
+        # Invalidate the user's GPG key.
+        db_generate_private_keys_for_user(session, user, password)
 
     # The various options related in manage PGP keys are used here.
     parse_pgp_options(state, user, request)
