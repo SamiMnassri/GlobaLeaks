@@ -43,7 +43,7 @@ def admin_serialize_receiver(session, receiver, user, language):
 
 def db_generate_private_keys_for_user(session, user, passphrase):
     log.info("Login: Generating crypto keypair for %s (%s)" % (user.username, user.role))
-    crypto_context = crypto.AsyncCryptographyContext()
+    crypto_context = crypto.AsymmetricalCryptographyContext()
     crypto_context.generate_private_key(passphrase)
     crypto_context.generate_self_signed_certificate(user.username)
     user.crypto_prv_key = crypto_context.private_key_pem

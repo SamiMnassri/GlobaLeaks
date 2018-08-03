@@ -1,17 +1,18 @@
 # -*- coding: utf-8
+import json
 import os
 from datetime import datetime
 import subprocess
 import tempfile
 
-from globaleaks.utils.crypto import AsyncCryptographyContext
+from globaleaks.utils.crypto import AsymmetricalCryptographyContext, SymmetricalCryptographyContext
 from globaleaks.tests import helpers
 
 from six import binary_type
 
-class TestCryptographicServices(helpers.TestGL):
+class TestAsymmetricalCryptographyContext(helpers.TestGL):
     def test_generate_key_pair(self):
-        context = AsyncCryptographyContext()
+        context = AsymmetricalCryptographyContext()
         context.generate_private_key("test")
 
         self.assertTrue("ENCRYPTED PRIVATE KEY" in context.private_key_pem)
@@ -19,7 +20,7 @@ class TestCryptographicServices(helpers.TestGL):
         
 
     def test_change_password(self):
-        context = AsyncCryptographyContext()
+        context = AsymmetricalCryptographyContext()
         context.generate_private_key("test")
         context.change_private_key_password("test2")
         with self.assertRaises(ValueError):
@@ -27,13 +28,13 @@ class TestCryptographicServices(helpers.TestGL):
         self.pkcs8_decrypt(context.private_key_pem, "test2")
 
     def test_create_self_signed_certificate(self):
-        context = AsyncCryptographyContext()
+        context = AsymmetricalCryptographyContext()
         context.generate_private_key("test")
         context.generate_self_signed_certificate("Test Certificate")
         self.assertTrue("BEGIN CERTIFICATE" in context.certificate_pem)
 
     def test_encrypt_decrypt(self):
-        context = AsyncCryptographyContext()
+        context = AsymmetricalCryptographyContext()
         context.generate_private_key("test")
         context.generate_self_signed_certificate("Test Certificate")
         enc_text = context.encrypt_data(b"test data")
@@ -54,3 +55,22 @@ class TestCryptographicServices(helpers.TestGL):
         finally:
             os.remove(crypted_key)
 
+class TestSymmetricalCryptographyContext(helpers.TestGL):
+    TEST_KEY = "L8XaHXAQQb2RQRPd9bgAVHrBjnq0aFx6pI9mzxSCXQw="
+
+    def test_keygen(self):
+        context = SymmetricalCryptographyContext()
+        context.generate_key()
+        self.assertIsNotNone(context.key)
+
+    def test_encrypt(self):
+        context = SymmetricalCryptographyContext.load_key(self.TEST_KEY)
+        blob = context.encrypt_data(b"test data")
+        decoded_blob = json.loads(blob)
+        self.assertEqual(decoded_blob['algorithm'], 'AESGCM256')
+        return blob
+
+    def test_decrypt(self):
+        data_blob = self.test_encrypt()
+        context = SymmetricalCryptographyContext.load_key(self.TEST_KEY)
+        self.assertEqual(context.decrypt_data(data_blob), b"test data")
