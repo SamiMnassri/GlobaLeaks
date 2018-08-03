@@ -77,17 +77,27 @@ class AsymmetricalCryptographyContext(object):
     def load_full_keyset(cls, private_key_pem, certificate_pem, passphrase):
         '''Loads the full keyset, and decrypts the private key in memory'''
         context = cls()
-        context.certificate_pem = certificate_pem
+        context._load_public_key(certificate_pem)
+
         context.private_key_pem = private_key_pem
 
         context.private_key = serialization.load_pem_private_key(
-            private_key_pem,
+            binary_type(private_key_pem, 'ascii'),
             password=passphrase,
             backend=default_backend()
         )
+        return context
 
-        context.certificate = x509.load_pem_x509_certificate(
-            certification_pem,
+    @classmethod
+    def load_public_key(cls, certificate_pem):
+        context = cls()
+        context._load_public_key(certificate_pem)
+        return context
+
+    def _load_public_key(self, certificate_pem):
+        self.certificate_pem = certificate_pem
+        self.certificate = x509.load_pem_x509_certificate(
+            binary_type(certificate_pem, 'ascii'),
             default_backend()
         )
 

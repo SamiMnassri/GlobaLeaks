@@ -4,7 +4,7 @@
 import copy
 import json
 
-from six import text_type
+from six import text_type, binary_type
 
 from globaleaks import models
 from globaleaks.handlers.admin.questionnaire import db_get_questionnaire
@@ -19,7 +19,7 @@ from globaleaks.utils.structures import get_localized_values
 from globaleaks.utils.token import TokenList
 from globaleaks.utils.utility import log, get_expiration, \
     datetime_now, datetime_never, datetime_to_ISO8601
-
+from globaleaks.utils.crypto import SymmetricalCryptographyContext, AsymmetricalCryptographyContext
 
 def db_assign_submission_progressive(session, tid):
     counter = session.query(models.Config).filter(models.Config.tid == tid, models.Config.var_name == u'counter_submissions').one()
@@ -245,7 +245,7 @@ def serialize_usertip(session, usertip, itip, language):
     return ret
 
 
-def db_create_receivertip(session, receiver, internaltip):
+def db_create_receivertip(session, receiver, internaltip, enc_key):
     """
     Create models.ReceiverTip for the required tier of models.Receiver.
     """
@@ -254,6 +254,7 @@ def db_create_receivertip(session, receiver, internaltip):
     receivertip = models.ReceiverTip()
     receivertip.internaltip_id = internaltip.id
     receivertip.receiver_id = receiver.id
+    receivertip.crypto_tip_key = enc_key
 
     session.add(receivertip)
 
@@ -320,6 +321,23 @@ def db_create_submission(session, tid, request, uploaded_files, client_using_tor
     wbtip.id = submission.id
     wbtip.tid = submission.tid
     wbtip.receipt_hash = hash_password(receipt, State.tenant_cache[tid].receipt_salt)
+
+    # Generate a crypto key pair for the whistleblower based around the receipt
+    asym_context = AsymmetricalCryptographyContext()
+    asym_context.generate_private_key(receipt)
+    asym_context.generate_self_signed_certificate("Whistleblower Certificate")
+
+    wbtip.crypto_pub_key = asym_context.certificate_pem
+    wbtip.crypto_prv_key = asym_context.private_key_pem
+
+    # Generate a symmetric key, and encrypt it with the private key of
+    # the whistleblower's public key
+    sym_context = SymmetricalCryptographyContext()
+    sym_context.generate_key()
+    wbtip.crypto_tip_key = asym_context.encrypt_data(
+        binary_type(sym_context.key, 'ascii')
+    )
+
     session.add(wbtip)
 
     db_save_questionnaire_answers(session, tid, submission.id, answers)
@@ -350,8 +368,13 @@ def db_create_submission(session, tid, request, uploaded_files, client_using_tor
                                          models.User.id == models.Receiver.id,
                                          models.UserTenant.user_id == models.User.id,
                                          models.UserTenant.tenant_id == tid):
-        if user.pgp_key_public or State.tenant_cache[tid].allow_unencrypted:
-            db_create_receivertip(session, receiver, submission)
+        if user.crypto_prv_key != '' or (user.pgp_key_public or State.tenant_cache[tid].allow_unencrypted):
+            asym_user_context = AsymmetricalCryptographyContext.load_public_key(user.crypto_key)
+            tip_enc_str = asym_user_context.encrypt_data(
+                binary_type(sym_context.key, 'ascii')
+            )
+
+            db_create_receivertip(session, receiver, submission, tip_enc_str)
             rtips_count += 1
 
     if rtips_count == 0:
