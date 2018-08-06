@@ -41,15 +41,24 @@ class TestAsymmetricalCryptographyContext(helpers.TestGL):
         cleartext = context.decrypt_data(enc_text)
         self.assertEqual(cleartext, b"test data")
 
+    def test_derieve_password(self):
+        expected_hash = '45b79a422b2b93633983ee16aeb90f36ad054174e491e2a2d528daab75a263a4bf5737639d238f956988042d3b99a69a58366d83085f0837ca65eca72637f7c6'
+        calc_hash = AsymmetricalCryptographyContext.derive_scrypted_passphrase('test', 'test')
+        self.assertEqual(expected_hash, calc_hash)
+
     def pkcs8_decrypt(self, priv_key_pem, passphrase):
         # Ensure that we can successfully read and decrypt the key with OpenSSL
         try:
+            if not isinstance(priv_key_pem, binary_type):
+                priv_key_pem = priv_key_pem.encode('ascii')
+
             msg_fd, crypted_key = tempfile.mkstemp()
-            os.write(msg_fd, binary_type(priv_key_pem, 'ascii'))
+            os.write(msg_fd, priv_key_pem)
             os.close(msg_fd)
             msg_fd = 0
             openssl_cmd = ["openssl", "pkcs8", "-in", crypted_key, "-passin", "pass:" + passphrase]
-            openssl_proc = subprocess.run(args=openssl_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+            openssl_proc = subprocess.Popen(openssl_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            openssl_proc.communicate()
             if openssl_proc.returncode != 0:
                 raise ValueError("Unable to decrypt private key!")
         finally:

@@ -1,5 +1,6 @@
 import base64
 
+import codecs
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import ec, rsa, padding
@@ -12,6 +13,8 @@ from six import binary_type, text_type
 import json
 import os
 
+import scrypt
+
 class AsymmetricalCryptographyContext(object):
     '''Provides cryptographic services based on x509 certificates'''
 
@@ -23,15 +26,27 @@ class AsymmetricalCryptographyContext(object):
         self.private_key_pem = None
 
     def _serialize_private_key(self, passphrase):
+        if not isinstance(passphrase, binary_type):
+            passphrase = passphrase.encode('ascii') 
+
         self.private_key_pem = text_type(self.private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.BestAvailableEncryption(binary_type(passphrase, 'utf-8'))
+            encryption_algorithm=serialization.BestAvailableEncryption(binary_type(passphrase))
         ), 'ascii')
 
     def _private_key_required(self):
         if self.private_key is None:
             raise ValueError("Operation only available with private key")
+
+    @staticmethod
+    def derive_scrypted_passphrase(base_pw, salt):
+        '''Derieves a passphrase based off 15 rounds of scrypt. The result hex encoded '''
+
+        # This was incredibly annoying to get a consistent result from Py2/Py
+        hash_str = scrypt.hash(base_pw, salt, N=1<<15)
+
+        return text_type(codecs.encode(hash_str, 'hex'), 'ascii')
 
     def generate_private_key(self, passphrase):
         '''Generates a private key and initialize the CryptographyContext'''
@@ -121,7 +136,10 @@ class AsymmetricalCryptographyContext(object):
         # whistleblower so we can identify them from the PEM certificate alone. We *might* want to encode
         # tenant id here somewhere.
 
-         # Self-signed certs use the same issuer/subject
+        # Self-signed certs use the same issuer/subject
+        if not isinstance(common_name, text_type):
+            common_name = common_name.decode('ascii')
+
         subject = issuer = x509.Name([
             x509.NameAttribute(x509.NameOID.COMMON_NAME, common_name)
         ])
