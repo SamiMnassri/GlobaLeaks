@@ -41,10 +41,16 @@ def admin_serialize_receiver(session, receiver, user, language):
 
     return get_localized_values(ret_dict, receiver, receiver.localized_keys, language)
 
-def db_generate_private_keys_for_user(session, user, passphrase):
+def db_generate_private_keys_for_user(session, tid, user, passphrase):
     log.info("Login: Generating crypto keypair for %s (%s)" % (user.username, user.role))
     crypto_context = crypto.AsymmetricalCryptographyContext()
-    crypto_context.generate_private_key(passphrase)
+    crypto_context.generate_private_key(
+        crypto.AsymmetricalCryptographyContext.derive_scrypted_passphrase(
+            passphrase,
+            State.tenant_cache[tid].receipt_salt
+        )
+    )
+
     crypto_context.generate_self_signed_certificate(user.username)
     user.crypto_prv_key = crypto_context.private_key_pem
     user.crypto_key = crypto_context.certificate_pem
@@ -142,7 +148,7 @@ def db_create_user(session, state, tid, request, language):
     parse_pgp_options(state, user, request)
 
     # Generate the private key
-    db_generate_private_keys_for_user(session, user, password)
+    db_generate_private_keys_for_user(session, tid, user, password)
 
     session.add(user)
 
@@ -174,8 +180,8 @@ def db_admin_update_user(session, state, tid, user_id, request, language):
     if password:
         user.password = security.hash_password(password, user.salt)
         user.password_change_date = datetime_now()
-        # Invalidate the user's GPG key.
-        db_generate_private_keys_for_user(session, user, password)
+        # Invalidate the user's priv key.
+        db_generate_private_keys_for_user(session, tid, user, password)
 
     # The various options related in manage PGP keys are used here.
     parse_pgp_options(state, user, request)

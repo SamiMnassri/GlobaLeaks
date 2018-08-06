@@ -94,13 +94,15 @@ class FileProducer(object):
 
 
 class Session(object):
-    def __init__(self, tid, user_id, user_role, pcn):
+    def __init__(self, tid, user_id, user_role, pcn, key):
         self.id = generateRandomKey(42)
         self.tid = tid
         self.user_id = user_id
         self.user_role = user_role
         self.pcn = pcn
+        self.key = key
         self.expireCall = None
+        self.user_status = user_status
 
     def getTime(self):
         return self.expireCall.getTime() if self.expireCall else 0
@@ -115,8 +117,8 @@ class Session(object):
         }
 
 
-def new_session(tid, user_id, user_role, user_status):
-    session = Session(tid, user_id, user_role, user_status)
+def new_session(tid, user_id, user_role, user_status, pcn, key):
+    session = Session(tid, user_id, user_role, pcn, key)
     Sessions.revoke_all_sessions(user_id)
     Sessions.set(session.id, session)
     return session

@@ -26,8 +26,9 @@ class AsymmetricalCryptographyContext(object):
         self.private_key_pem = None
 
     def _serialize_private_key(self, passphrase):
+        # If passphrase is none, we're not encrypted
         if not isinstance(passphrase, binary_type):
-            passphrase = passphrase.encode('ascii') 
+            passphrase = passphrase.encode('ascii')
 
         self.private_key_pem = text_type(self.private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
@@ -96,6 +97,9 @@ class AsymmetricalCryptographyContext(object):
 
         context.private_key_pem = private_key_pem
 
+        if isinstance(passphrase, text_type):
+            passphrase = passphrase.encode('ascii')
+
         context.private_key = serialization.load_pem_private_key(
             binary_type(private_key_pem, 'ascii'),
             password=passphrase,
@@ -122,6 +126,15 @@ class AsymmetricalCryptographyContext(object):
         self._private_key_required()
         self._serialize_private_key(new_passphrase)
         return self.private_key_pem
+
+    def get_decrypted_private_key(self):
+        '''Returns the decrypted private key'''
+
+        return text_type(self.private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        ), 'ascii')
 
     def generate_self_signed_certificate(self, common_name):
         '''Generates a self-signed certificate'''

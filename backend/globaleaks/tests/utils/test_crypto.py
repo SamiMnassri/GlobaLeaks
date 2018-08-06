@@ -46,6 +46,12 @@ class TestAsymmetricalCryptographyContext(helpers.TestGL):
         calc_hash = AsymmetricalCryptographyContext.derive_scrypted_passphrase('test', 'test')
         self.assertEqual(expected_hash, calc_hash)
 
+    def test_get_no_pass_pem(self):
+        context = AsymmetricalCryptographyContext()
+        context.generate_private_key("test")
+
+        self.assertTrue("-----BEGIN PRIVATE KEY-----" in context.get_decrypted_private_key())
+
     def pkcs8_decrypt(self, priv_key_pem, passphrase):
         # Ensure that we can successfully read and decrypt the key with OpenSSL
         try:

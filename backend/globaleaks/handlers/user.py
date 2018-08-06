@@ -110,6 +110,7 @@ def db_user_update_user(session, state, tid, user_id, request):
     """
     from globaleaks.handlers.admin.notification import db_get_notification
     from globaleaks.handlers.admin.node import db_admin_serialize_node
+    from globaleaks.handlers.admin.user import db_generate_private_keys_for_user
 
     user = models.db_get(session,
                          models.User,
@@ -133,13 +134,19 @@ def db_user_update_user(session, state, tid, user_id, request):
         user.password_change_date = datetime_now()
 
         # Change password on priv key
-        if user.crypto_prv_key is None or user.crypto_prv_key == "":
+        if user.crypto_prv_key is None or user.crypto_prv_key == "" or old_password == "":
+            # old_password seems to end up "" if password_changed_needed is True, and we're
+            # FIXME: ... this may need a rethink on the PCN codepaths
+            db_generate_private_keys_for_user(session, tid, user, new_password)
+        else:
             context = AsymmetricalCryptographyContext.load_full_keyset(
                 user.crypto_prv_key,
                 user.crypto_key,
-                new_password
+                AsymmetricalCryptographyContext.derive_scrypted_passphrase(old_password, State.tenant_cache[tid].receipt_salt)
             )
-            user.crypto_prv_key = context.change_private_key_password(new_password)
+            user.crypto_prv_key = context.change_private_key_password(
+                AsymmetricalCryptographyContext.derive_scrypted_passphrase(new_password, State.tenant_cache[tid].receipt_salt)
+            )
 
     # If the email address changed, send a validation email
     if request['mail_address'] != user.mail_address:

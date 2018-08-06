@@ -16,7 +16,7 @@ from globaleaks.rest import errors, requests
 from globaleaks.settings import Settings
 from globaleaks.state import State
 from globaleaks.utils.utility import datetime_now, deferred_sleep, log, parse_csv_ip_ranges_to_ip_networks
-
+from globaleaks.utils.crypto import AsymmetricalCryptographyContext
 
 def random_login_delay():
     """
@@ -72,7 +72,7 @@ def login_whistleblower(session, tid, receipt, client_using_tor):
 
     itip.wb_last_access = datetime_now()
 
-    return new_session(tid, wbtip.id, 'whistleblower', False)
+    return new_session(tid, wbtip.id, 'whistleblower', False, wbtip.crypto_prv_key)
 
 
 @transact
@@ -131,11 +131,16 @@ def login(session, tid, username, password, client_using_tor, client_ip, token='
     # Generate a PGP key if necessary
     if user.crypto_prv_key is None or user.crypto_prv_key == "":
         from globaleaks.handlers.admin.user import db_generate_private_keys_for_user
-        db_generate_private_keys_for_user(session, user, password)
+        db_generate_private_keys_for_user(session, tid, user, password)
 
     user.last_login = datetime_now()
+    context = AsymmetricalCryptographyContext.load_full_keyset(
+        user.crypto_prv_key,
+        user.crypto_key,
+        AsymmetricalCryptographyContext.derive_scrypted_passphrase(password, State.tenant_cache[tid].receipt_salt)
+    )
 
-    return new_session(tid, user.id, user.role, user.password_change_needed)
+    return new_session(tid, user.id, user.role, user.password_change_needed, context.get_decrypted_private_key())
 
 
 @transact
