@@ -168,7 +168,7 @@ class AsymmetricalCryptographyContext(object):
             datetime.datetime.utcnow()
         ).not_valid_after(
             # FIXME: determine SANE length
-            datetime.datetime.utcnow() + datetime.timedelta(days=3650)
+            datetime.datetime.utcnow() + datetime.timedelta(days=36500)
         ).sign(self.private_key, hashes.SHA256(), default_backend())
 
         self.certificate_pem = text_type(
