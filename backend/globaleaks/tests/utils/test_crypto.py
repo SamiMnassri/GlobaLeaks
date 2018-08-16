@@ -17,7 +17,6 @@ class TestAsymmetricalCryptographyContext(helpers.TestGL):
 
         self.assertTrue("ENCRYPTED PRIVATE KEY" in context.private_key_pem)
         self.pkcs8_decrypt(context.private_key_pem, "test")
-        
 
     def test_change_password(self):
         context = AsymmetricalCryptographyContext()
