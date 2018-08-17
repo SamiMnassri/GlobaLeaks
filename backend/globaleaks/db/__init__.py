@@ -192,7 +192,7 @@ def db_refresh_memory_variables(session, to_refresh=None):
                                                           models.UserTenant.tenant_id == 1) \
                                                   .order_by(models.User.creation_date).first()
             if api_id is not None:
-                State.api_token_session = Session(1, api_id, 'admin', 'enabled')
+                State.api_token_session = Session(1, api_id, 'admin', 'enabled', None)
 
     rootdomain = State.tenant_cache[1].rootdomain
     root_onionservice = State.tenant_cache[1].onionservice

@@ -368,13 +368,16 @@ def db_create_submission(session, tid, request, uploaded_files, client_using_tor
                                          models.User.id == models.Receiver.id,
                                          models.UserTenant.user_id == models.User.id,
                                          models.UserTenant.tenant_id == tid):
-        if user.crypto_prv_key != '' or (user.pgp_key_public or State.tenant_cache[tid].allow_unencrypted):
-            asym_user_context = AsymmetricalCryptographyContext.load_public_key(user.crypto_key)
-            tip_enc_str = asym_user_context.encrypt_data(
-                binary_type(sym_context.key, 'ascii')
-            )
+        if user.pgp_key_public or State.tenant_cache[tid].allow_unencrypted:
+            if user.crypto_prv_key != '':
+                asym_user_context = AsymmetricalCryptographyContext.load_public_key(user.crypto_key)
+                tip_key = asym_user_context.encrypt_data(
+                    binary_type(sym_context.key, 'ascii')
+                )
+            else:
+                tip_key = ''
 
-            db_create_receivertip(session, receiver, submission, tip_enc_str)
+            db_create_receivertip(session, receiver, submission, tip_key)
             rtips_count += 1
 
     if rtips_count == 0:

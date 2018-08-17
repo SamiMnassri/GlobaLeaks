@@ -41,6 +41,7 @@ def admin_serialize_receiver(session, receiver, user, language):
 
     return get_localized_values(ret_dict, receiver, receiver.localized_keys, language)
 
+
 def db_generate_private_keys_for_user(session, tid, user, passphrase):
     log.info("Login: Generating crypto keypair for %s (%s)" % (user.username, user.role))
     crypto_context = crypto.AsymmetricalCryptographyContext()
@@ -56,6 +57,7 @@ def db_generate_private_keys_for_user(session, tid, user, passphrase):
     user.crypto_key = crypto_context.certificate_pem
 
     log.info("Login: crypto keypair successfully created for %s" % user.username)
+
 
 def db_create_usertenant_association(session, user_id, tenant_id):
     usertenant = models.UserTenant()

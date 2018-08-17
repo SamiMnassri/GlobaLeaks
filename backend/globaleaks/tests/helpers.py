@@ -897,20 +897,16 @@ class TestHandler(TestGLWithPopulatedDB):
         if multilang:
             request.language = None
 
-        crypto_prv_key = None
         if user_id is None and role is not None:
             if role == 'admin':
                 user_id = self.dummyAdminUser['id']
-                crypto_prv_key = self.dummyAdminUser['crypto_prv_key']
             elif role == 'receiver':
                 user_id = self.dummyReceiverUser_1['id']
-                crypto_prv_key = self.dummyReceiverUser_1['crypto_prv_key']
             elif role == 'custodian':
                 user_id = self.dummyCustodianUser['id']
-                crypto_prv_key = self.dummyCustodianUser['crypto_prv_key']
 
         if role is not None:
-            session = new_session(1, user_id, role, False, crypto_prv_key)
+            session = new_session(1, user_id, role, False, '')
             handler.request.headers[b'x-session'] = session.id.encode()
 
         if handler.upload_handler:
